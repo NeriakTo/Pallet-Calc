@@ -1,0 +1,42 @@
+# Pallet Stacking Calculator (棧板堆疊計算器)
+
+這是一個基於 Web 的輕量級棧板堆疊與材積計算工具，專為業務與倉儲人員設計。
+無需安裝、無需後端伺服器，支援 Excel 匯出功能。
+
+## 🚀 線上使用 (Live Demo)
+[點擊此處開啟應用程式](https://neriakto.github.io/Pallet-Calc/)
+
+## 📖 專案背景與目標
+業務在面對多 SKU 訂單時，需要快速產出「可實際執行」的棧板堆疊方案。本工具解決了傳統 Excel 計算耗時、易出錯且難以指導現場堆疊的問題。
+
+### 核心功能
+1. **參數化設定**：支援自定義棧板尺寸 (L/W)、最大堆高與棧板高度。
+2. **自動計算**：
+   - 自動判斷最佳平面排列方向 (Dir1 vs Dir2)。
+   - 計算每棧板最大箱數、滿棧板數與餘數。
+3. **智慧混棧 (Heuristic Level 1)**：
+   - 針對餘數箱進行「層級」混棧。
+   - 採用 First-Fit Descending 演算法，優先處理高度較高的貨物以確保穩定。
+4. **視覺化輸出**：
+   - 提供「由下往上」的堆疊層序指示，與現場作業一致。
+   - 計算貨物 CBM/CUFT 及含棧板總材積。
+5. **Excel 匯出**：一鍵產出包含匯總與詳細堆疊清單的 .xlsx 報表。
+
+## 🛠️ 技術架構
+- **Frontend**: 純 HTML5 / CSS3 / JavaScript (ES6+)
+- **Dependency**: [SheetJS (xlsx)](https://sheetjs.com/) (用於 Excel 匯出)
+- **Deployment**: GitHub Pages
+- **Privacy**: 所有計算皆在瀏覽器端 (Client-side) 完成，資料不回傳伺服器。
+
+## 📦 離線使用指南
+若需在無網路環境（如工廠內部）使用：
+1. 下載本專案的 `index.html`。
+2. 下載 `xlsx.full.min.js` 並與 html 放置於同目錄。
+3. 修改 html 中的 script 來源為本地路徑。
+4. 直接用瀏覽器開啟即可。
+
+## 📝 版本紀錄
+- **v1.0.0**: 初始發布，包含基礎計算、混棧邏輯與 Excel 匯出功能。
+
+---
+© 2026 Chang-ching Enterprise Co., Ltd. Internal Tool.
