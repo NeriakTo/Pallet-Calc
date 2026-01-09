@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棧板堆疊計算器 (Excel 匯出版)</title>
+    <title>棧板堆疊計算器 v1.1 (多單位版)</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -20,8 +20,9 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid var(--border-color); padding: 10px; text-align: center; }
         th { background: var(--primary-color); color: #fff; }
-        input[type="number"], input[type="text"] { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
-        
+        input[type="number"], input[type="text"], select { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        select { background-color: #fff; cursor: pointer; }
+
         /* 按鈕區域 */
         .actions { margin: 20px 0; display: flex; gap: 10px; }
         button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; }
@@ -46,15 +47,16 @@
         .badge-mix { background: #e67e22; }
 
         .error-msg { color: red; font-weight: bold; margin: 10px 0; }
+        .unit-label { font-size: 0.8em; color: #666; display: block; margin-top: 2px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📦 棧板堆疊計算器 (Excel 匯出版)</h1>
+    <h1>📦 棧板堆疊計算器 v1.1 (多單位版)</h1>
 
     <section>
-        <h2>1. 棧板設定</h2>
+        <h2>1. 棧板設定 (預設公分)</h2>
         <table>
             <thead>
                 <tr>
@@ -82,21 +84,28 @@
         <table id="skuTable">
             <thead>
                 <tr>
-                    <th>操作</th>
+                    <th style="width: 60px;">操作</th>
                     <th>品號 (SKU)</th>
-                    <th>每箱入數 (pcs/ctn)</th>
-                    <th>訂單總量 (pcs)</th>
-                    <th>外箱長 L (cm)</th>
-                    <th>外箱寬 W (cm)</th>
-                    <th>外箱高 H (cm)</th>
+                    <th style="width: 120px;">尺寸單位</th>
+                    <th>每箱入數</th>
+                    <th>訂單(pcs)</th>
+                    <th>長 L</th>
+                    <th>寬 W</th>
+                    <th>高 H</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td><button class="btn-del" onclick="removeRow(this)">刪除</button></td>
-                    <td><input type="text" value="ITEM-001"></td>
-                    <td><input type="number" value="10"></td>
-                    <td><input type="number" value="1500"></td>
+                    <td><input type="text" value="MOEN-Item-A"></td>
+                    <td>
+                        <select class="unit-select">
+                            <option value="cm">公分 (cm)</option>
+                            <option value="tw_fen">台分</option>
+                        </select>
+                    </td>
+                    <td><input type="number" value="12"></td>
+                    <td><input type="number" value="600"></td>
                     <td><input type="number" value="40"></td>
                     <td><input type="number" value="30"></td>
                     <td><input type="number" value="25"></td>
@@ -112,7 +121,7 @@
     </section>
 
     <div id="resultArea" class="result-section" style="display:none;">
-        <h2>3. 計算結果</h2>
+        <h2>3. 計算結果 (統一轉為公分計算)</h2>
         
         <div class="summary-box">
             <h3>📊 訂單合計</h3>
@@ -126,6 +135,7 @@
             <thead>
                 <tr>
                     <th>品號</th>
+                    <th>原始尺寸 (L/W/H)</th>
                     <th>總箱數</th>
                     <th>每層箱數 (C)</th>
                     <th>滿棧板數</th>
@@ -141,15 +151,17 @@
 </div>
 
 <script>
-    // --- 資料結構定義 (SD 2.1 - 2.3) ---
+    // --- 常數定義 ---
+    const TW_FEN_TO_CM = 0.303; // 1 台分 = 0.303 公分
+
+    // --- 資料結構 ---
     let palletParams = {};
     let skuList = [];
-    let palletPlans = []; // 最終計算出的所有棧板
+    let palletPlans = [];
 
-    // 初始化頁面
+    // 初始化
     updateHH();
 
-    // 更新可用高度
     function updateHH() {
         const maxH = parseFloat(document.getElementById('maxH').value) || 0;
         const pH = parseFloat(document.getElementById('pH').value) || 0;
@@ -157,13 +169,18 @@
         document.getElementById('dispHH').innerText = HH > 0 ? HH : 0;
     }
 
-    // 表格操作
     function addRow() {
         const tbody = document.querySelector('#skuTable tbody');
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><button class="btn-del" onclick="removeRow(this)">刪除</button></td>
             <td><input type="text" value="New-Item"></td>
+            <td>
+                <select class="unit-select">
+                    <option value="cm">公分 (cm)</option>
+                    <option value="tw_fen">台分</option>
+                </select>
+            </td>
             <td><input type="number" value="1"></td>
             <td><input type="number" value="100"></td>
             <td><input type="number" value="30"></td>
@@ -182,9 +199,8 @@
         }
     }
 
-    // --- 核心計算 (CoreCalc) ---
+    // --- 核心計算 ---
     function calculate() {
-        // 重置資料
         document.getElementById('errorArea').innerText = "";
         document.getElementById('resultArea').style.display = "none";
         document.getElementById('btnExport').style.display = "none";
@@ -205,64 +221,86 @@
 
         palletParams = { pL, pW, maxH, pH, HH };
 
-        // 2. 讀取與驗證 SKU
+        // 2. 讀取與驗證 SKU (含單位換算)
         const rows = document.querySelectorAll('#skuTable tbody tr');
         let hasError = false;
 
         rows.forEach((row, index) => {
             const inputs = row.querySelectorAll('input');
+            const select = row.querySelector('select');
+            
             const skuName = inputs[0].value.trim();
+            const unitType = select.value;
             const pcsPerCtn = parseInt(inputs[1].value);
             const orderPcs = parseInt(inputs[2].value);
-            const cL = parseFloat(inputs[3].value);
-            const cW = parseFloat(inputs[4].value);
-            const cH = parseFloat(inputs[5].value);
+            let rawL = parseFloat(inputs[3].value);
+            let rawW = parseFloat(inputs[4].value);
+            let rawH = parseFloat(inputs[5].value);
 
-            if (!skuName || [pcsPerCtn, orderPcs, cL, cW, cH].some(v => v <= 0 || isNaN(v))) {
+            if (!skuName || [pcsPerCtn, orderPcs, rawL, rawW, rawH].some(v => v <= 0 || isNaN(v))) {
                 showError(`第 ${index+1} 列資料不完整或數值錯誤`);
                 hasError = true;
                 return;
             }
 
-            // 驗證尺寸
+            // 單位換算：全部轉為 CM 進行計算
+            let multiplier = (unitType === 'tw_fen') ? TW_FEN_TO_CM : 1;
+            
+            // 轉換後的尺寸 (用於計算)
+            let cL = rawL * multiplier;
+            let cW = rawW * multiplier;
+            let cH = rawH * multiplier;
+
+            // 驗證尺寸 (使用 CM 比較)
             if (cH > HH) {
-                showError(`SKU [${skuName}] 箱高 (${cH}) 超過可用堆疊高度 (${HH})`);
+                showError(`SKU [${skuName}] 換算後箱高 (${cH.toFixed(1)} cm) 超過可用堆疊高度 (${HH} cm)`);
                 hasError = true;
                 return;
             }
 
-            skuList.push({ skuName, pcsPerCtn, orderPcs, cL, cW, cH });
+            skuList.push({ 
+                skuName, 
+                pcsPerCtn, 
+                orderPcs, 
+                
+                // 儲存原始輸入 (顯示用)
+                inputUnit: unitType === 'tw_fen' ? '台分' : 'cm',
+                rawL, rawW, rawH,
+
+                // 儲存計算用尺寸 (CM)
+                cL, cW, cH 
+            });
         });
 
         if (hasError) return;
 
-        // 3. 執行 Per-SKU 計算 (SA 8.1 - 8.4)
-        let allRemainderLayers = []; // 收集所有餘數層用於混棧
+        // 3. 執行 Per-SKU 計算
+        let allRemainderLayers = [];
 
         skuList.forEach(sku => {
             // 總箱數
             sku.totalCartons = Math.ceil(sku.orderPcs / sku.pcsPerCtn);
 
-            // 每層可放箱數 (SA 8.2)
+            // 每層可放箱數 (使用 CM 計算)
             const dir1 = Math.floor(pL / sku.cL) * Math.floor(pW / sku.cW);
             const dir2 = Math.floor(pL / sku.cW) * Math.floor(pW / sku.cL);
             sku.C = Math.max(dir1, dir2);
 
             if (sku.C === 0) {
-                showError(`SKU [${sku.skuName}] 平面尺寸太大，無法放入棧板`);
+                showError(`SKU [${sku.skuName}] 尺寸太大，無法放入棧板`);
                 hasError = true;
                 return;
             }
 
             // 最大層數 M
             sku.M = Math.floor(HH / sku.cH);
-            sku.P = sku.C * sku.M; // 滿棧箱數
+            sku.P = sku.C * sku.M; 
 
             // 滿棧板與餘數
             sku.fullPalletsCount = Math.floor(sku.totalCartons / sku.P);
             sku.remainderCtns = sku.totalCartons - (sku.fullPalletsCount * sku.P);
 
-            // 生成滿棧板 (SD 3.2)
+            // 生成滿棧板
             for (let i = 0; i < sku.fullPalletsCount; i++) {
                 const layers = [];
                 for (let l = 0; l < sku.M; l++) {
@@ -271,16 +309,14 @@
                 palletPlans.push(createPalletObj("滿棧板", layers));
             }
 
-            // 處理餘數層 (SD 3.3)
+            // 處理餘數層
             if (sku.remainderCtns > 0) {
                 const fullLayersInRem = Math.floor(sku.remainderCtns / sku.C);
                 const partialCtn = sku.remainderCtns % sku.C;
 
-                // 滿層
                 for (let k = 0; k < fullLayersInRem; k++) {
                     allRemainderLayers.push({ skuName: sku.skuName, cartons: sku.C, height: sku.cH, isPartial: false });
                 }
-                // 半層
                 if (partialCtn > 0) {
                     allRemainderLayers.push({ skuName: sku.skuName, cartons: partialCtn, height: sku.cH, isPartial: true });
                 }
@@ -289,46 +325,38 @@
 
         if (hasError) return;
 
-        // 4. 餘數混棧邏輯 (Level 1 Heuristic - First Fit Descending)
-        // 依照層高由高到低排序 (SD 3.4)
+        // 4. 餘數混棧邏輯
         allRemainderLayers.sort((a, b) => b.height - a.height);
 
-        // 開始混棧
-        let mixedPallets = []; // 暫存混棧棧板
-        
+        let mixedPallets = [];
         allRemainderLayers.forEach(layer => {
             let placed = false;
-            // 嘗試放入現有的混棧棧板
             for (let p of mixedPallets) {
-                if (p.currentHeight + layer.height <= HH) {
+                // 使用 epsilon 避免浮點數誤差
+                if (p.currentHeight + layer.height <= HH + 0.001) {
                     p.layers.push(layer);
                     p.currentHeight += layer.height;
                     placed = true;
                     break;
                 }
             }
-            // 放不下則開新棧板
             if (!placed) {
                 mixedPallets.push({
                     type: "餘數混棧",
-                    layers: [layer], // 第一層 (最底)
+                    layers: [layer],
                     currentHeight: layer.height
                 });
             }
         });
 
-        // 將混棧加入總表
         mixedPallets.forEach(mp => {
             palletPlans.push(createPalletObj(mp.type, mp.layers));
         });
 
-        // 5. 渲染結果
         renderResults();
     }
 
-    // 輔助：建立棧板物件並計算 CBM
     function createPalletObj(type, layers) {
-        // layers index 0 is bottom
         let totalCtn = 0;
         let cargoH = 0;
         let cargoCBM = 0;
@@ -336,7 +364,6 @@
         layers.forEach(l => {
             totalCtn += l.cartons;
             cargoH += l.height;
-            // 找出該層 SKU 對應的尺寸計算材積
             const skuObj = skuList.find(s => s.skuName === l.skuName);
             if (skuObj) {
                 const cbmPerBox = (skuObj.cL * skuObj.cW * skuObj.cH) / 1000000;
@@ -344,7 +371,6 @@
             }
         });
 
-        // 棧板體積 (含棧板)
         const pL = palletParams.pL;
         const pW = palletParams.pW;
         const pH = palletParams.pH;
@@ -354,7 +380,7 @@
         return {
             id: palletPlans.length + 1,
             type: type,
-            layers: layers, // [bottom, ..., top]
+            layers: layers, 
             totalCartons: totalCtn,
             cargoHeight: cargoH,
             totalHeight: totalH,
@@ -363,7 +389,6 @@
         };
     }
 
-    // --- 渲染 (Renderer) ---
     function renderResults() {
         const resultArea = document.getElementById('resultArea');
         const summaryBody = document.getElementById('skuSummaryBody');
@@ -374,16 +399,17 @@
         summaryBody.innerHTML = '';
         detailDiv.innerHTML = '';
 
-        // 總計變數
         let grandTotalPallets = palletPlans.length;
         let grandCargoCBM = 0;
         let grandPalletCBM = 0;
 
-        // 渲染 SKU 摘要
         skuList.forEach(sku => {
             const tr = document.createElement('tr');
+            // 顯示原始輸入尺寸 + 單位
+            const dimText = `${sku.rawL}x${sku.rawW}x${sku.rawH} (${sku.inputUnit})`;
             tr.innerHTML = `
                 <td>${sku.skuName}</td>
+                <td>${dimText}</td>
                 <td>${sku.totalCartons}</td>
                 <td>${sku.C}</td>
                 <td>${sku.fullPalletsCount}</td>
@@ -392,31 +418,27 @@
             summaryBody.appendChild(tr);
         });
 
-        // 渲染棧板明細
         palletPlans.forEach((p, idx) => {
             grandCargoCBM += p.cargoCBM;
             grandPalletCBM += p.palletCBM;
 
             const div = document.createElement('div');
             div.className = 'pallet-card';
-            
             const badgeClass = p.type === '滿棧板' ? 'badge-full' : 'badge-mix';
             
-            // 組合每層明細 HTML (反向顯示：上層在視覺上方，但資料結構 index 0 是底層)
-            // 為了讓視覺符合物理堆疊，我們在顯示時將 layers 反轉渲染，但標註層數
             let layersHtml = '<ul class="layer-list">';
-            const layersReversed = [...p.layers].reverse(); // 複製並反轉用於顯示
+            const layersReversed = [...p.layers].reverse(); 
             const totalLayers = p.layers.length;
 
             layersReversed.forEach((layer, i) => {
-                const layerNum = totalLayers - i; // 計算實際層號 (由下往上數)
+                const layerNum = totalLayers - i;
                 const note = layer.isPartial ? '(非滿層)' : '';
                 const style = layer.isPartial ? 'color: #d35400;' : '';
                 layersHtml += `
                     <li class="layer-item">
-                        <span><strong>第 ${layerNum} 層</strong> (底層起算)</span>
+                        <span><strong>第 ${layerNum} 層</strong></span>
                         <span style="${style}">${layer.skuName} x ${layer.cartons} 箱 ${note}</span>
-                        <span>層高: ${layer.height} cm</span>
+                        <span>高: ${layer.height.toFixed(1)} cm</span>
                     </li>
                 `;
             });
@@ -436,7 +458,6 @@
             detailDiv.appendChild(div);
         });
 
-        // 更新總計
         document.getElementById('totalPallets').innerText = grandTotalPallets;
         document.getElementById('totalCargoCBM').innerText = grandCargoCBM.toFixed(3);
         document.getElementById('totalCargoCUFT').innerText = (grandCargoCBM * 35.315).toFixed(2);
@@ -445,32 +466,31 @@
     }
 
     function showError(msg) {
-        const err = document.getElementById('errorArea');
-        err.innerText = "錯誤：" + msg;
+        document.getElementById('errorArea').innerText = "錯誤：" + msg;
     }
 
-    // --- Excel 匯出功能 (New Feature) ---
     function exportToExcel() {
-        if (palletPlans.length === 0) {
-            alert("無資料可匯出");
-            return;
-        }
+        if (palletPlans.length === 0) { alert("無資料可匯出"); return; }
 
-        // 準備 Sheet 1: 匯總資料
         const summaryData = [
-            ["棧板堆疊方案報告"],
+            ["棧板堆疊方案報告 (含單位換算)"],
             ["匯出時間", new Date().toLocaleString()],
             [],
-            ["棧板參數"],
-            ["長(cm)", "寬(cm)", "最大堆高(cm)", "棧板高(cm)", "可用高(cm)"],
+            ["棧板參數 (CM)"],
+            ["長", "寬", "最大堆高", "棧板高", "可用高"],
             [palletParams.pL, palletParams.pW, palletParams.maxH, palletParams.pH, palletParams.HH],
             [],
             ["訂單 SKU 匯總"],
-            ["品號", "總箱數", "每層箱數(C)", "滿棧板數", "餘數箱數"]
+            ["品號", "原始單位", "原始長", "原始寬", "原始高", "總箱數", "每層箱數(C)", "滿棧板數", "餘數箱數"]
         ];
 
         skuList.forEach(s => {
-            summaryData.push([s.skuName, s.totalCartons, s.C, s.fullPalletsCount, s.remainderCtns]);
+            summaryData.push([
+                s.skuName, 
+                s.inputUnit, 
+                s.rawL, s.rawW, s.rawH, // 匯出原始輸入
+                s.totalCartons, s.C, s.fullPalletsCount, s.remainderCtns
+            ]);
         });
 
         summaryData.push([]);
@@ -479,44 +499,34 @@
         summaryData.push(["總貨物 CBM", document.getElementById('totalCargoCBM').innerText]);
         summaryData.push(["總含棧板 CBM", document.getElementById('totalPalletCBM').innerText]);
 
-        // 準備 Sheet 2: 詳細堆疊清單
-        // 格式設計：棧板號 | 類型 | 總箱數 | 總高 | 貨物CBM | 層號 | SKU | 該層箱數 | 層高
         const detailData = [
             ["棧板編號", "類型", "棧板總箱數", "含棧板總高(cm)", "含棧板CBM", "層次 (由下往上)", "SKU", "該層箱數", "層高(cm)"]
         ];
 
         palletPlans.forEach((p, idx) => {
-            // 對於每一層，我們加入一行資料
-            // 第一行包含棧板資訊，後續行留空
             p.layers.forEach((layer, layerIdx) => {
                 const isFirstLayer = (layerIdx === 0);
                 const row = [
                     isFirstLayer ? (idx + 1) : "",
                     isFirstLayer ? p.type : "",
                     isFirstLayer ? p.totalCartons : "",
-                    isFirstLayer ? p.totalHeight : "",
+                    isFirstLayer ? p.totalHeight.toFixed(1) : "",
                     isFirstLayer ? p.palletCBM.toFixed(3) : "",
-                    layerIdx + 1, // 第幾層
+                    layerIdx + 1,
                     layer.skuName,
                     layer.cartons,
-                    layer.height
+                    layer.height.toFixed(1)
                 ];
                 detailData.push(row);
             });
-            // 每個棧板間空一行
             detailData.push([]); 
         });
 
-        // 建立 Workbook
         const wb = XLSX.utils.book_new();
-        
         const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
         const wsDetail = XLSX.utils.aoa_to_sheet(detailData);
-
         XLSX.utils.book_append_sheet(wb, wsSummary, "匯總報告");
         XLSX.utils.book_append_sheet(wb, wsDetail, "堆疊明細");
-
-        // 下載檔案
         XLSX.writeFile(wb, "Pallet_Plan_Export.xlsx");
     }
 </script>
