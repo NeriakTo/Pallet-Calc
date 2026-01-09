@@ -1,6 +1,6 @@
 # Pallet Stacking Calculator (棧板堆疊計算器)
 
-![Version](https://img.shields.io/badge/version-v1.3-blue.svg)
+![Version](https://img.shields.io/badge/version-v1.4-blue.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 
 這是一個基於 Web 的輕量級棧板堆疊與材積計算工具，專為業務與倉儲人員設計。
@@ -9,9 +9,13 @@
 ## 🚀 線上使用 (Live Demo)
 [點擊此處開啟應用程式](https://neriakto.github.io/Pallet-Calc/)
 
-## 🌟 v1.3 最新功能
-- **📄 PDF 報表輸出**：整合 `html2pdf.js`，可一鍵將計算結果（含圖形化堆疊指示）匯出為高解析度 A4 PDF，方便列印簽核。
-- **單位與容許值**：延續 v1.2 功能，完整支援「台分」單位換算與棧板「容許超出範圍 (Overhang)」設定。
+## 🌟 v1.4 版面優化
+- **📄 PDF 緊湊排版 (Compact Layout)**：大幅縮減 PDF 匯出時的留白與間距，移除不必要的標題，最大化 A4 版面利用率。
+- **邊距調整**：將 PDF 邊距縮減至 5mm，讓內容顯示更完整。
+
+## 🌟 v1.3 功能回顧
+- **PDF 報表輸出**：整合 `html2pdf.js`，可一鍵將計算結果匯出為高解析度文件。
+- **雙重匯出**：同時支援 Excel (.xlsx) 與 PDF (.pdf)。
 
 ## 📖 專案背景與目標
 業務在面對多 SKU 訂單時，需要快速產出「可實際執行」的棧板堆疊方案。本工具解決了傳統 Excel 計算耗時、易出錯且難以指導現場堆疊的問題。
@@ -29,9 +33,6 @@
 4.  **視覺化輸出**：
     - 提供「由下往上」的堆疊層序指示，與現場作業一致。
     - 計算貨物 CBM/CUFT 及含棧板總材積。
-5.  **雙重匯出**：
-    - **Excel**: 產出包含匯總數據與詳細清單的 .xlsx 檔（含原始單位對照）。
-    - **PDF**: 產出所見即所得的完整排版報表。
 
 ## 🛠️ 技術架構
 - **Frontend**: 純 HTML5 / CSS3 / JavaScript (ES6+)
@@ -50,10 +51,11 @@
 *下載後請記得修改 index.html 內的 `<script>` 來源路徑。*
 
 ## 📝 版本紀錄 (Changelog)
-- **v1.3 (Current)**: 新增 PDF 匯出功能，支援高解析度圖文報表。
-- **v1.2**: 新增台分/公分單位切換、新增棧板容許超出範圍 (Overhang) 設定、優化預設值。
+- **v1.4 (Current)**: PDF 排版優化，移除冗餘標題並實作緊湊模式 (Compact Mode)。
+- **v1.3**: 新增 PDF 匯出功能。
+- **v1.2**: 新增台分/公分單位切換、新增棧板容許超出範圍設定。
 - **v1.1**: 基礎單位換算功能試行。
-- **v1.0**: 初始發布，包含基礎計算、混棧邏輯與 Excel 匯出功能。
+- **v1.0**: 初始發布。
 
 ---
 © 2026 Chang-ching Enterprise Co., Ltd. Internal Tool.

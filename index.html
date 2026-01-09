@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棧板堆疊計算器 v1.3</title>
+    <title>棧板堆疊計算器 v1.4</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -36,32 +36,76 @@
         .btn-del { background: #e74c3c; color: #fff; padding: 5px 10px; }
         
         /* 匯出按鈕群 */
-        .btn-export { background: #217346; color: #fff; } /* Excel Green */
+        .btn-export { background: #217346; color: #fff; } 
         .btn-export:hover { background: #1e6b41; }
-        .btn-pdf { background: #c0392b; color: #fff; } /* PDF Red */
+        .btn-pdf { background: #c0392b; color: #fff; } 
         .btn-pdf:hover { background: #a93226; }
 
-        /* 結果顯示區 */
+        /* 結果顯示區 (螢幕顯示用) */
         .result-section { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
         .summary-box { background: #e8f6f3; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .pallet-card { border: 1px solid #ccc; margin-bottom: 15px; border-radius: 5px; overflow: hidden; page-break-inside: avoid; /* PDF 分頁不切斷卡片 */ }
+        .pallet-card { border: 1px solid #ccc; margin-bottom: 15px; border-radius: 5px; overflow: hidden; page-break-inside: avoid; }
         .pallet-header { background: #eee; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; }
         .pallet-body { padding: 15px; }
         .layer-list { list-style: none; padding: 0; margin: 0; }
         .layer-item { padding: 5px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; }
         .layer-item:last-child { border-bottom: none; }
+        
         .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; color: white; }
         .badge-full { background: #2980b9; }
         .badge-mix { background: #e67e22; }
-
         .error-msg { color: red; font-weight: bold; margin: 10px 0; }
         .dim-convert { color: #2980b9; font-size: 0.9em; }
+
+        /* --- PDF 專用緊湊模式 (v1.4 新增) --- */
+        /* 當容器被加上 .pdf-mode 時，強制覆蓋樣式以節省空間 */
+        .pdf-mode .summary-box {
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .pdf-mode h3 {
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+            border-bottom: 1px solid #ccc; /* 標題加底線更清楚，省去 margin */
+        }
+        .pdf-mode table {
+            margin-bottom: 10px;
+            font-size: 0.85em; /* 表格字體縮小 */
+        }
+        .pdf-mode th, .pdf-mode td {
+            padding: 4px; /* 表格內距縮小 */
+        }
+        .pdf-mode .pallet-card {
+            margin-bottom: 8px; /* 棧板卡片間距縮小 */
+            border: 1px solid #999;
+        }
+        .pdf-mode .pallet-header {
+            padding: 5px 8px; /* 標題內距縮小 */
+            background-color: #ddd; 
+            font-size: 0.9em;
+        }
+        .pdf-mode .pallet-body {
+            padding: 5px 8px; /* 內容內距縮小 */
+        }
+        .pdf-mode .layer-item {
+            padding: 2px 0; /* 重點：層與層之間極度緊湊 */
+            border-bottom: 1px solid #ccc;
+            font-size: 0.85em;
+        }
+        .pdf-mode hr {
+            margin: 5px 0;
+        }
+        .pdf-mode p {
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📦 棧板堆疊計算器 v1.3</h1>
+    <h1>📦 棧板堆疊計算器 v1.4</h1>
 
     <section>
         <h2>1. 棧板與容許誤差設定</h2>
@@ -134,11 +178,12 @@
         <div id="errorArea" class="error-msg"></div>
     </section>
 
-    <div id="resultArea" class="result-section" style="display:none;">
-        <h2>3. 計算結果</h2>
+    <h2 id="resultTitle" style="display:none; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">3. 計算結果</h2>
+    
+    <div id="resultArea" style="display:none;">
         
         <div class="summary-box">
-            <h3>📊 訂單合計</h3>
+            <h3 style="margin-top:0;">📊 訂單合計</h3>
             <p>總棧板數：<strong id="totalPallets">0</strong> 棧</p>
             <p>總貨物材積：<span id="totalCargoCBM">0</span> CBM / <span id="totalCargoCUFT">0</span> CUFT</p>
             <p>含棧板材積 (以標準棧板尺寸估算)：<span id="totalPalletCBM">0</span> CBM</p>
@@ -217,9 +262,13 @@
     // --- 核心計算 ---
     function calculate() {
         document.getElementById('errorArea').innerText = "";
-        document.getElementById('resultArea').style.display = "none";
-        document.getElementById('btnExport').style.display = "none";
-        document.getElementById('btnPdf').style.display = "none";
+        
+        // 顯示結果區塊與按鈕
+        document.getElementById('resultTitle').style.display = "block";
+        document.getElementById('resultArea').style.display = "block";
+        document.getElementById('btnExport').style.display = "inline-block";
+        document.getElementById('btnPdf').style.display = "inline-block";
+        
         skuList = [];
         palletPlans = [];
 
@@ -380,13 +429,9 @@
     }
 
     function renderResults() {
-        const resultArea = document.getElementById('resultArea');
         const summaryBody = document.getElementById('skuSummaryBody');
         const detailDiv = document.getElementById('palletDetails');
         
-        resultArea.style.display = 'block';
-        document.getElementById('btnExport').style.display = 'inline-block';
-        document.getElementById('btnPdf').style.display = 'inline-block';
         summaryBody.innerHTML = '';
         detailDiv.innerHTML = '';
 
@@ -466,12 +511,14 @@
         document.getElementById('errorArea').innerText = "錯誤：" + msg;
     }
 
-    // --- Excel 匯出 ---
     function exportToExcel() {
         if (palletPlans.length === 0) { alert("無資料可匯出"); return; }
-
+        // Excel 邏輯保持不變 (略，與 v1.3 相同)
+        // 為節省篇幅，此處直接使用上方已驗證過的 Excel 邏輯，若需完整代碼請複製 v1.3 的 exportToExcel 區塊
+        
+        // 重新填入 Excel 邏輯
         const summaryData = [
-            ["棧板堆疊方案報告 (v1.3)"],
+            ["棧板堆疊方案報告 (v1.4)"],
             ["匯出時間", new Date().toLocaleString()],
             [],
             ["棧板與公差參數 (CM)"],
@@ -522,7 +569,7 @@
         XLSX.writeFile(wb, "Pallet_Plan_Export.xlsx");
     }
 
-    // --- PDF 匯出 (New Feature) ---
+    // --- PDF 匯出 (v1.4 優化版) ---
     function exportToPDF() {
         const element = document.getElementById('resultArea');
         if (element.style.display === 'none') {
@@ -530,17 +577,22 @@
             return;
         }
 
-        // PDF 設定參數
+        // 1. 啟動 PDF 緊湊模式
+        element.classList.add('pdf-mode');
+
+        // 2. PDF 設定參數 (優化邊界與縮放)
         const opt = {
-            margin:       10, // mm
+            margin:       5, // mm (從 10 改為 5，減少留白)
             filename:     'Pallet_Plan_Report.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 }, // 提高縮放比例以獲得清晰文字
+            html2canvas:  { scale: 2 }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        // 執行轉換並下載
-        html2pdf().set(opt).from(element).save();
+        // 3. 執行轉換並下載，完成後移除緊湊模式
+        html2pdf().set(opt).from(element).save().then(() => {
+            element.classList.remove('pdf-mode');
+        });
     }
 </script>
 
