@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棧板堆疊計算器 v1.1 (多單位版)</title>
+    <title>棧板堆疊計算器 v1.2</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -22,6 +22,9 @@
         th { background: var(--primary-color); color: #fff; }
         input[type="number"], input[type="text"], select { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
         select { background-color: #fff; cursor: pointer; }
+
+        /* 特殊標註欄位 */
+        .tolerance-input { border: 2px solid #f39c12 !important; background-color: #fef9e7; }
 
         /* 按鈕區域 */
         .actions { margin: 20px 0; display: flex; gap: 10px; }
@@ -47,24 +50,26 @@
         .badge-mix { background: #e67e22; }
 
         .error-msg { color: red; font-weight: bold; margin: 10px 0; }
-        .unit-label { font-size: 0.8em; color: #666; display: block; margin-top: 2px; }
+        .unit-note { font-size: 0.85em; color: #666; display: block; margin-top: 2px; }
+        .dim-convert { color: #2980b9; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📦 棧板堆疊計算器 v1.1 (多單位版)</h1>
+    <h1>📦 棧板堆疊計算器 v1.2</h1>
 
     <section>
-        <h2>1. 棧板設定 (預設公分)</h2>
+        <h2>1. 棧板與容許誤差設定</h2>
         <table>
             <thead>
                 <tr>
                     <th>棧板長 L (cm)</th>
                     <th>棧板寬 W (cm)</th>
-                    <th>最大堆高(含棧板) (cm)</th>
+                    <th>標準最大堆高 (cm)</th>
                     <th>棧板高度 (cm)</th>
-                    <th>可用貨物堆疊高度 (cm)</th>
+                    <th style="background:#f39c12">允許長寬超出 (cm)</th>
+                    <th style="background:#f39c12">允許高度超出 (cm)</th>
                 </tr>
             </thead>
             <tbody>
@@ -73,14 +78,18 @@
                     <td><input type="number" id="pW" value="100" onchange="updateHH()"></td>
                     <td><input type="number" id="maxH" value="200" onchange="updateHH()"></td>
                     <td><input type="number" id="pH" value="15" onchange="updateHH()"></td>
-                    <td><strong id="dispHH" style="color:blue">185</strong></td>
+                    <td><input type="number" id="overhangLW" value="10" class="tolerance-input" onchange="updateHH()"></td>
+                    <td><input type="number" id="overhangH" value="5" class="tolerance-input" onchange="updateHH()"></td>
                 </tr>
             </tbody>
         </table>
+        <div style="text-align:right; margin-top:5px; color:#555;">
+            實際計算可用高度 = (標準堆高 + 允許超高) - 棧板高 = <strong id="dispHH" style="color:blue">190</strong> cm
+        </div>
     </section>
 
     <section>
-        <h2>2. SKU 清單</h2>
+        <h2>2. SKU 清單 (預設單位：台分)</h2>
         <table id="skuTable">
             <thead>
                 <tr>
@@ -100,15 +109,15 @@
                     <td><input type="text" value="ITEM-001"></td>
                     <td>
                         <select class="unit-select">
-                            <option value="tw_fen">台分</option>
-                            <option value="cm">公分 (cm)</option>                            
+                            <option value="tw_fen" selected>台分</option>
+                            <option value="cm">公分 (cm)</option>
                         </select>
                     </td>
-                    <td><input type="number" value="12"></td>
-                    <td><input type="number" value="600"></td>
-                    <td><input type="number" value="40"></td>
-                    <td><input type="number" value="30"></td>
-                    <td><input type="number" value="25"></td>
+                    <td><input type="number" value="10"></td>
+                    <td><input type="number" value="1000"></td>
+                    <td><input type="number" value="183"></td>
+                    <td><input type="number" value="84"></td>
+                    <td><input type="number" value="65"></td>
                 </tr>
             </tbody>
         </table>
@@ -121,13 +130,13 @@
     </section>
 
     <div id="resultArea" class="result-section" style="display:none;">
-        <h2>3. 計算結果 (統一轉為公分計算)</h2>
+        <h2>3. 計算結果</h2>
         
         <div class="summary-box">
             <h3>📊 訂單合計</h3>
             <p>總棧板數：<strong id="totalPallets">0</strong> 棧</p>
             <p>總貨物材積：<span id="totalCargoCBM">0</span> CBM / <span id="totalCargoCUFT">0</span> CUFT</p>
-            <p>含棧板材積：<span id="totalPalletCBM">0</span> CBM / <span id="totalPalletCUFT">0</span> CUFT (估算運費參考)</p>
+            <p>含棧板材積 (以標準棧板尺寸估算)：<span id="totalPalletCBM">0</span> CBM</p>
         </div>
 
         <h3>📋 SKU 詳情</h3>
@@ -135,7 +144,8 @@
             <thead>
                 <tr>
                     <th>品號</th>
-                    <th>原始尺寸 (L/W/H)</th>
+                    <th>輸入尺寸 (L/W/H)</th>
+                    <th>換算公分 (cm)</th>
                     <th>總箱數</th>
                     <th>每層箱數 (C)</th>
                     <th>滿棧板數</th>
@@ -165,10 +175,14 @@
     function updateHH() {
         const maxH = parseFloat(document.getElementById('maxH').value) || 0;
         const pH = parseFloat(document.getElementById('pH').value) || 0;
-        const HH = maxH - pH;
+        const overhangH = parseFloat(document.getElementById('overhangH').value) || 0;
+        
+        // 可用貨物高度 = (最大限制 + 允許超高) - 棧板本身高
+        const HH = (maxH + overhangH) - pH;
         document.getElementById('dispHH').innerText = HH > 0 ? HH : 0;
     }
 
+    // 新增 SKU 列 (預設值調整為需求)
     function addRow() {
         const tbody = document.querySelector('#skuTable tbody');
         const tr = document.createElement('tr');
@@ -177,15 +191,15 @@
             <td><input type="text" value="New-Item"></td>
             <td>
                 <select class="unit-select">
+                    <option value="tw_fen" selected>台分</option>
                     <option value="cm">公分 (cm)</option>
-                    <option value="tw_fen">台分</option>
                 </select>
             </td>
-            <td><input type="number" value="1"></td>
-            <td><input type="number" value="100"></td>
-            <td><input type="number" value="30"></td>
-            <td><input type="number" value="30"></td>
-            <td><input type="number" value="20"></td>
+            <td><input type="number" value="10"></td>
+            <td><input type="number" value="1000"></td>
+            <td><input type="number" value="183"></td>
+            <td><input type="number" value="84"></td>
+            <td><input type="number" value="65"></td>
         `;
         tbody.appendChild(tr);
     }
@@ -207,19 +221,25 @@
         skuList = [];
         palletPlans = [];
 
-        // 1. 讀取棧板參數
+        // 1. 讀取棧板與公差參數
         const pL = parseFloat(document.getElementById('pL').value);
         const pW = parseFloat(document.getElementById('pW').value);
         const maxH = parseFloat(document.getElementById('maxH').value);
         const pH = parseFloat(document.getElementById('pH').value);
-        const HH = maxH - pH;
+        const overhangLW = parseFloat(document.getElementById('overhangLW').value) || 0;
+        const overhangH = parseFloat(document.getElementById('overhangH').value) || 0;
+
+        // 計算邏輯使用的「有效棧板範圍」 (包含允許超出的部分)
+        const effectivePL = pL + overhangLW; // 可用長度
+        const effectivePW = pW + overhangLW; // 可用寬度 (假設長寬皆可超)
+        const HH = (maxH + overhangH) - pH;  // 可用高度
 
         if ([pL, pW, maxH, pH].some(v => v <= 0 || isNaN(v))) {
             showError("棧板參數必須為正數");
             return;
         }
 
-        palletParams = { pL, pW, maxH, pH, HH };
+        palletParams = { pL, pW, maxH, pH, HH, overhangLW, overhangH };
 
         // 2. 讀取與驗證 SKU (含單位換算)
         const rows = document.querySelectorAll('#skuTable tbody tr');
@@ -251,7 +271,7 @@
             let cW = rawW * multiplier;
             let cH = rawH * multiplier;
 
-            // 驗證尺寸 (使用 CM 比較)
+            // 驗證尺寸 (使用 寬容後的 HH 比較)
             if (cH > HH) {
                 showError(`SKU [${skuName}] 換算後箱高 (${cH.toFixed(1)} cm) 超過可用堆疊高度 (${HH} cm)`);
                 hasError = true;
@@ -262,12 +282,8 @@
                 skuName, 
                 pcsPerCtn, 
                 orderPcs, 
-                
-                // 儲存原始輸入 (顯示用)
                 inputUnit: unitType === 'tw_fen' ? '台分' : 'cm',
                 rawL, rawW, rawH,
-
-                // 儲存計算用尺寸 (CM)
                 cL, cW, cH 
             });
         });
@@ -281,18 +297,19 @@
             // 總箱數
             sku.totalCartons = Math.ceil(sku.orderPcs / sku.pcsPerCtn);
 
-            // 每層可放箱數 (使用 CM 計算)
-            const dir1 = Math.floor(pL / sku.cL) * Math.floor(pW / sku.cW);
-            const dir2 = Math.floor(pL / sku.cW) * Math.floor(pW / sku.cL);
+            // 每層可放箱數 (使用 Effective 尺寸計算)
+            // 邏輯：箱子必須能放入 (棧板+公差) 的範圍內
+            const dir1 = Math.floor(effectivePL / sku.cL) * Math.floor(effectivePW / sku.cW);
+            const dir2 = Math.floor(effectivePL / sku.cW) * Math.floor(effectivePW / sku.cL);
             sku.C = Math.max(dir1, dir2);
 
             if (sku.C === 0) {
-                showError(`SKU [${sku.skuName}] 尺寸太大，無法放入棧板`);
+                showError(`SKU [${sku.skuName}] 尺寸太大，無法放入棧板 (含允許超出範圍)`);
                 hasError = true;
                 return;
             }
 
-            // 最大層數 M
+            // 最大層數 M (使用 HH 計算)
             sku.M = Math.floor(HH / sku.cH);
             sku.P = sku.C * sku.M; 
 
@@ -332,7 +349,7 @@
         allRemainderLayers.forEach(layer => {
             let placed = false;
             for (let p of mixedPallets) {
-                // 使用 epsilon 避免浮點數誤差
+                // 使用 epsilon 避免浮點數誤差，並使用 HH (已含公差) 判斷
                 if (p.currentHeight + layer.height <= HH + 0.001) {
                     p.layers.push(layer);
                     p.currentHeight += layer.height;
@@ -356,6 +373,7 @@
         renderResults();
     }
 
+    // 計算單個棧板的數值
     function createPalletObj(type, layers) {
         let totalCtn = 0;
         let cargoH = 0;
@@ -375,6 +393,8 @@
         const pW = palletParams.pW;
         const pH = palletParams.pH;
         const totalH = cargoH + pH;
+        // PalletCBM 計算維持使用「標準棧板」佔地面積 (若需精確計算超出體積，可改為 effectivePL)
+        // 這裡保守計算，通常貨櫃規劃是以標準棧板格位為基礎
         const palletCBM = (pL * pW * totalH) / 1000000;
 
         return {
@@ -405,11 +425,20 @@
 
         skuList.forEach(sku => {
             const tr = document.createElement('tr');
-            // 顯示原始輸入尺寸 + 單位
-            const dimText = `${sku.rawL}x${sku.rawW}x${sku.rawH} (${sku.inputUnit})`;
+            
+            // 顯示原始輸入
+            const dimRaw = `${sku.rawL}x${sku.rawW}x${sku.rawH} (${sku.inputUnit})`;
+            
+            // 顯示換算公分 (若是台分)
+            let dimCm = `${sku.cL.toFixed(1)}x${sku.cW.toFixed(1)}x${sku.cH.toFixed(1)}`;
+            if (sku.inputUnit === 'cm') {
+                dimCm = "-"; // 若原始就是 cm，這欄顯示 - 簡化視覺
+            }
+
             tr.innerHTML = `
                 <td>${sku.skuName}</td>
-                <td>${dimText}</td>
+                <td>${dimRaw}</td>
+                <td class="dim-convert">${dimCm}</td>
                 <td>${sku.totalCartons}</td>
                 <td>${sku.C}</td>
                 <td>${sku.fullPalletsCount}</td>
@@ -434,11 +463,16 @@
                 const layerNum = totalLayers - i;
                 const note = layer.isPartial ? '(非滿層)' : '';
                 const style = layer.isPartial ? 'color: #d35400;' : '';
+                
+                // 找出對應 SKU 以取得單位顯示
+                const skuObj = skuList.find(s => s.skuName === layer.skuName);
+                const heightStr = skuObj ? `${skuObj.cH.toFixed(1)} cm` : `${layer.height} cm`;
+
                 layersHtml += `
                     <li class="layer-item">
                         <span><strong>第 ${layerNum} 層</strong></span>
                         <span style="${style}">${layer.skuName} x ${layer.cartons} 箱 ${note}</span>
-                        <span>高: ${layer.height.toFixed(1)} cm</span>
+                        <span>高: ${heightStr}</span>
                     </li>
                 `;
             });
@@ -473,22 +507,31 @@
         if (palletPlans.length === 0) { alert("無資料可匯出"); return; }
 
         const summaryData = [
-            ["棧板堆疊方案報告 (含單位換算)"],
+            ["棧板堆疊方案報告 (v1.2)"],
             ["匯出時間", new Date().toLocaleString()],
             [],
-            ["棧板參數 (CM)"],
-            ["長", "寬", "最大堆高", "棧板高", "可用高"],
-            [palletParams.pL, palletParams.pW, palletParams.maxH, palletParams.pH, palletParams.HH],
+            ["棧板與公差參數 (CM)"],
+            ["長", "寬", "標準最大堆高", "棧板高", "長寬允許超出", "高度允許超出", "計算用可用高"],
+            [
+                palletParams.pL, 
+                palletParams.pW, 
+                palletParams.maxH, 
+                palletParams.pH, 
+                palletParams.overhangLW, 
+                palletParams.overhangH,
+                palletParams.HH
+            ],
             [],
             ["訂單 SKU 匯總"],
-            ["品號", "原始單位", "原始長", "原始寬", "原始高", "總箱數", "每層箱數(C)", "滿棧板數", "餘數箱數"]
+            ["品號", "原始單位", "原始長", "原始寬", "原始高", "換算長(cm)", "換算寬(cm)", "換算高(cm)", "總箱數", "每層箱數(C)", "滿棧板數", "餘數箱數"]
         ];
 
         skuList.forEach(s => {
             summaryData.push([
                 s.skuName, 
                 s.inputUnit, 
-                s.rawL, s.rawW, s.rawH, // 匯出原始輸入
+                s.rawL, s.rawW, s.rawH,
+                s.cL.toFixed(1), s.cW.toFixed(1), s.cH.toFixed(1),
                 s.totalCartons, s.C, s.fullPalletsCount, s.remainderCtns
             ]);
         });
