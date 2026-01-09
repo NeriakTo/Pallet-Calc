@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棧板堆疊計算器 v1.4</title>
+    <title>棧板堆疊計算器 v1.5</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -24,7 +24,6 @@
         input[type="number"], input[type="text"], select { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
         select { background-color: #fff; cursor: pointer; }
 
-        /* 特殊標註欄位 */
         .tolerance-input { border: 2px solid #f39c12 !important; background-color: #fef9e7; }
 
         /* 按鈕區域 */
@@ -34,8 +33,6 @@
         .btn-calc:hover { background: #2980b9; }
         .btn-add { background: #27ae60; color: #fff; }
         .btn-del { background: #e74c3c; color: #fff; padding: 5px 10px; }
-        
-        /* 匯出按鈕群 */
         .btn-export { background: #217346; color: #fff; } 
         .btn-export:hover { background: #1e6b41; }
         .btn-pdf { background: #c0392b; color: #fff; } 
@@ -57,55 +54,81 @@
         .error-msg { color: red; font-weight: bold; margin: 10px 0; }
         .dim-convert { color: #2980b9; font-size: 0.9em; }
 
-        /* --- PDF 專用緊湊模式 (v1.4 新增) --- */
-        /* 當容器被加上 .pdf-mode 時，強制覆蓋樣式以節省空間 */
+        /* --- PDF 專用 A4 適配模式 (v1.5) --- */
+        .pdf-mode {
+            /* 強制設定寬度為 200mm (A4 寬 210mm - 左右邊界 5mm*2) */
+            width: 200mm !important;
+            max-width: 200mm !important;
+            box-sizing: border-box;
+            background-color: #fff;
+            
+            /* 清除所有可能的外部留白 */
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+        }
+
+        /* 消除頂部留白 */
         .pdf-mode .summary-box {
-            padding: 10px;
-            margin-bottom: 10px;
-            font-size: 0.9em;
+            padding: 8px;
+            margin-bottom: 8px;
+            margin-top: 0 !important; /* 關鍵：移除上方間距 */
+            font-size: 0.85em;
+            background-color: #f0f0f0; /* 淺灰底色省墨 */
         }
+
         .pdf-mode h3 {
-            margin-top: 10px;
+            margin-top: 5px;
             margin-bottom: 5px;
-            font-size: 1.1em;
-            border-bottom: 1px solid #ccc; /* 標題加底線更清楚，省去 margin */
+            font-size: 1em;
+            border-bottom: 1px solid #999;
+            color: #000;
         }
+
+        /* 表格緊湊化 */
         .pdf-mode table {
-            margin-bottom: 10px;
-            font-size: 0.85em; /* 表格字體縮小 */
+            margin-bottom: 8px;
+            font-size: 0.8em;
+            width: 100% !important; /* 強制表格填滿 200mm */
+            table-layout: fixed; /* 避免單一欄位過寬撐開 */
         }
         .pdf-mode th, .pdf-mode td {
-            padding: 4px; /* 表格內距縮小 */
+            padding: 2px 4px; /* 極小內距 */
+            word-wrap: break-word; /* 防止文字溢出 */
         }
+
+        /* 棧板卡片緊湊化 */
         .pdf-mode .pallet-card {
-            margin-bottom: 8px; /* 棧板卡片間距縮小 */
-            border: 1px solid #999;
+            margin-bottom: 10px; /* 卡片間距 */
+            border: 1px solid #666;
+            box-shadow: none;
+            page-break-inside: avoid; /* 盡量不切斷卡片 */
         }
         .pdf-mode .pallet-header {
-            padding: 5px 8px; /* 標題內距縮小 */
-            background-color: #ddd; 
+            padding: 4px 6px;
+            background-color: #ccc;
             font-size: 0.9em;
+            color: #000;
         }
         .pdf-mode .pallet-body {
-            padding: 5px 8px; /* 內容內距縮小 */
+            padding: 4px 6px;
         }
         .pdf-mode .layer-item {
-            padding: 2px 0; /* 重點：層與層之間極度緊湊 */
-            border-bottom: 1px solid #ccc;
-            font-size: 0.85em;
-        }
-        .pdf-mode hr {
-            margin: 5px 0;
+            padding: 1px 0; /* 層與層之間幾無縫隙 */
+            border-bottom: 1px solid #ddd;
+            font-size: 0.8em;
+            line-height: 1.2;
         }
         .pdf-mode p {
-            margin: 5px 0;
+            margin: 2px 0;
+            font-size: 0.85em;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📦 棧板堆疊計算器 v1.4</h1>
+    <h1>📦 棧板堆疊計算器 v1.5</h1>
 
     <section>
         <h2>1. 棧板與容許誤差設定</h2>
@@ -193,13 +216,13 @@
         <table id="skuSummaryTable">
             <thead>
                 <tr>
-                    <th>品號</th>
-                    <th>輸入尺寸 (L/W/H)</th>
-                    <th>換算公分 (cm)</th>
+                    <th style="width:25%">品號</th>
+                    <th>輸入尺寸</th>
+                    <th>換算公分</th>
                     <th>總箱數</th>
-                    <th>每層箱數 (C)</th>
-                    <th>滿棧板數</th>
-                    <th>餘數箱數</th>
+                    <th>每層(C)</th>
+                    <th>滿棧</th>
+                    <th>餘數</th>
                 </tr>
             </thead>
             <tbody id="skuSummaryBody"></tbody>
@@ -513,12 +536,9 @@
 
     function exportToExcel() {
         if (palletPlans.length === 0) { alert("無資料可匯出"); return; }
-        // Excel 邏輯保持不變 (略，與 v1.3 相同)
-        // 為節省篇幅，此處直接使用上方已驗證過的 Excel 邏輯，若需完整代碼請複製 v1.3 的 exportToExcel 區塊
         
-        // 重新填入 Excel 邏輯
         const summaryData = [
-            ["棧板堆疊方案報告 (v1.4)"],
+            ["棧板堆疊方案報告 (v1.5)"],
             ["匯出時間", new Date().toLocaleString()],
             [],
             ["棧板與公差參數 (CM)"],
@@ -569,7 +589,7 @@
         XLSX.writeFile(wb, "Pallet_Plan_Export.xlsx");
     }
 
-    // --- PDF 匯出 (v1.4 優化版) ---
+    // --- PDF 匯出 (v1.5 A4 適配版) ---
     function exportToPDF() {
         const element = document.getElementById('resultArea');
         if (element.style.display === 'none') {
@@ -577,20 +597,25 @@
             return;
         }
 
-        // 1. 啟動 PDF 緊湊模式
+        // 1. 啟動 A4 強制寬度模式
         element.classList.add('pdf-mode');
 
-        // 2. PDF 設定參數 (優化邊界與縮放)
+        // 2. PDF 設定參數
         const opt = {
-            margin:       5, // mm (從 10 改為 5，減少留白)
+            margin:       [5, 5, 5, 5], // 上右下左 5mm 窄邊界
             filename:     'Pallet_Plan_Report.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 }, 
+            html2canvas:  { 
+                scale: 2, 
+                useCORS: true,
+                scrollY: 0 // 防止畫面捲動造成的偏移
+            }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        // 3. 執行轉換並下載，完成後移除緊湊模式
+        // 3. 執行轉換
         html2pdf().set(opt).from(element).save().then(() => {
+            // 匯出後移除模式，恢復螢幕瀏覽樣式
             element.classList.remove('pdf-mode');
         });
     }
